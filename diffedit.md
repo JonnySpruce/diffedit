@@ -344,7 +344,7 @@ Now we've done some processing, the mask looks like the below image:
 
 That's a pretty good start, however what we really want is a mask which is either present or not at a certain pixel. To achieve this, we will set all values under a threshold as 0 and all above as 1, giving us binary values to work with for the mask. The DiffEdit paper suggests setting this threshold at 0.5, however with our testing we found a lower value was more effective. This may depend on the similarity of your two prompts.
 
-We can write try a few different threshold values and visualise the resulting mask. This will allow us to choose a value that works well for our image:
+We can try a few different threshold values and visualise the resulting mask. This will allow us to choose a value that works well for our image:
     
 ![png](diffedit_files/diffedit_69_0.png)
 
@@ -424,7 +424,7 @@ Next we combine the two sets of latents, to ensure that `yt` (the generated late
 ```python
 noisy_latents = mask*yt+((1-mask)*xt)
 ```
-Our mask is a tensor with either 1 or 0 as its values, where 1 is within the masked area and 0 values for everyhere else. The first part of this code `mask*yt` is effectively multiplying the latents by 0 outside of the masked area, stopping the generated latents from having any influence on the image outside of the masked area. The second part of the equation: `((1-mask)*xt)`, which is doing the opposite - `1-mask`, makes all of the non-masked areas be equal to 1 and the masked areas equal to 0, so when we multiply `xt` by this, we reduce the influence of these latents **within** the masked area to 0. We add the two parts of this equation together to produce the input latents to the next step, where `xt` makes up the non-masked area of the latents, but `yt` makes up the masked area. These latents then make the input to the next loop of the denoising process.
+Our mask is a tensor with either 1 or 0 as its values, where 1 is within the masked area and 0 values for everywhere else. The first part of this code `mask*yt` is effectively multiplying the latents by 0 outside of the masked area, stopping the generated latents from having any influence on the image outside of the masked area. The second part of the equation: `((1-mask)*xt)`, which is doing the opposite - `1-mask`, makes all of the non-masked areas be equal to 1 and the masked areas equal to 0, so when we multiply `xt` by this, we reduce the influence of these latents **within** the masked area to 0. We add the two parts of this equation together to produce the input latents to the next step, where `xt` makes up the non-masked area of the latents, but `yt` makes up the masked area. These latents then make the input to the next loop of the denoising process.
 
 
 ```python
@@ -502,10 +502,10 @@ diffedit(fruit_bowl_image, caption, query, noise_strength=1, seed=1)
 
 ## Conclusion
 
-When working on this DiffEdit pipeline we set out to implement the techniques in the paper using our own custom pipeline. As you can see in the example above, we were able to acheive this with accurate mask generation and decent final image replacement. This shows that DiffEdit is a very powerful technique, and it was suprisingly easy to adapt an img2img pipeline to work with the DiffEdit technique. The ability to pass in just two different text prompts and have an accurate mask generated as a result was truly impressive.
+When working on this DiffEdit pipeline we set out to implement the techniques in the paper using our own custom pipeline. As you can see in the example above, we were able to achieve this with accurate mask generation and decent final image replacement. This shows that DiffEdit is a very powerful technique, and it was surprisingly easy to adapt an img2img pipeline to work with the DiffEdit technique. The ability to pass in just two different text prompts and have an accurate mask generated as a result was truly impressive.
 
 There is still more for us to explore with this technique, from tweaking the various parameters further to tune both the mask creation and the image generation, to further understanding what prompts give the best results. It would also be interesting to adapt this to work with Stable Diffusion 2 or SDXL and see how that affects both the mask creation and final image generation.
 
-TODO: maybe talk about google magic eraser?
+An interesting use case for the DiffEdit technique is something like Google's [Magic Eraser](https://blog.google/products/photos/magic-eraser-android-ios-google-one/), where it automatically creates a mask which highlights people in the background of an image, and then replaces those people with a continuation of the scenery rather than another object. It could be a fun extension task to try and adapt this pipeline to take in an image and try to remove people from the background automatically.
 
 Thanks for reading! If you liked this blog post and want to see the full notebook we used to write the code and generate all of the images (along with some bonus content), then [take a look at it on Kaggle](https://www.kaggle.com/code/jonnyspruce/diffedit/edit/run/153852675).
