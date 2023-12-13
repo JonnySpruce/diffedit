@@ -1,6 +1,8 @@
 # DiffEdit
 
-In this blog post, we will be demonstrating how to use the DiffEdit technique described in [this paper](https://arxiv.org/abs/2210.11427), to use a diffusion model to modify just one part of an existing image using simple text prompts. DiffEdit utilises the diffusion model which is used to predict where noise is in an image, typically as a way of generating images using text prompts. In this blog post we assume you have basic knowledge of Stable Diffusion and how it works, as this is the diffusion model that we will be using throughout our examples. If you want to read more about diffusion models, then check out our other blog post about it here [TODO]().
+In this blog post, we will be demonstrating how to use the DiffEdit technique described in [this paper](https://arxiv.org/abs/2210.11427), to use a diffusion model to modify just one part of an existing image using simple text prompts. DiffEdit utilises the diffusion model which is used to predict where noise is in an image, typically as a way of generating images using text prompts. In this blog post we assume you have basic knowledge of Stable Diffusion and how it works, as this is the diffusion model that we will be using throughout our examples. 
+
+This blog post is based on [our notebook on Kaggle](https://www.kaggle.com/code/jonnyspruce/diffedit/edit/run/153852675). In this post we aim to provide a distilled version of the full code, explaining the important steps while skipping some of the more basic setup code. Check out the notebook if you want to see the full code or are interested in running it or adapting it yourself.
 
 We will work through an example where we use the DiffEdit technique to modify an image of a horse into an image of a zebra. This will be our final result:
 
@@ -21,38 +23,9 @@ In the sections below we will work through these steps. First we will work throu
 
 # Creating the image mask
 
-The first step of the DiffEdit technique is creating the mask by utilising the difference in noise prediction between two text prompts. The first prompt is the part of the image that you want to replace, and the second prompt should be what you want to replace it with, so in our examples we're going to set our prompts to be `"horse"` and `"zebra"` respectively.
-
-
-```python
-original_prompt = "horse"
-new_prompt = "zebra"
-```
-
-We will also define a few initial variables which we will use throughout the code, including loading the initial image.
-
-
-```python
-height = 512
-width = 512
-img_path = '/kaggle/input/horseimg/horse-cc.png'
-original_image = Image.open(img_path).resize((height, width))
-
-batch_size = 1
-
-torch.manual_seed(99);
-```
+The first step of the DiffEdit technique is creating the mask by utilising the difference in noise prediction between two text prompts. The first prompt is the part of the image that you want to replace, and the second prompt should be what you want to replace it with, so in our examples we're going to set our original prompt to be `"horse"` and the new prompt to be `"zebra"`.
 
 Let's take a look at our original image.
-
-
-```python
-original_image
-```
-
-
-
-
     
 ![png](diffedit_files/diffedit_22_0.png)
     
@@ -71,17 +44,12 @@ Our diffusion model is unable to work with images directly, so we first have to 
 original_image_latents = encode(original_image)
 ```
 
+We can investigate the shape of our image latents:
 
-```python
-original_image_latents.shape
-```
-
-
-
-
-    torch.Size([1, 4, 64, 64])
-
-
+> ```python
+> > original_image_latents.shape
+> torch.Size([1, 4, 64, 64])
+> ```
 
 We can see that the image has been converted into a 1x64x64x4 tensor, which is the latent format that our particular diffusion model can work with. The images below show you what those latents look like over the 4 layers:
 
@@ -117,25 +85,24 @@ def create_text_embeddings(prompts, batch_size=1):
 To get an idea of what the tokenised text looks like:
 
 
-```python
-tokenizer(["horse"], padding="max_length", max_length=tokenizer.model_max_length, truncation=True, return_tensors="pt")
-```
-
-
-
-
-    {'input_ids': tensor([[49406,  4558, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407,
-             49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407,
-             49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407,
-             49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407,
-             49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407,
-             49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407,
-             49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407,
-             49407, 49407, 49407, 49407, 49407, 49407, 49407]]), 'attention_mask': tensor([[1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-             0, 0, 0, 0, 0]])}
-
+>```python
+>> tokenizer(["horse"], padding="max_length", max_length=tokenizer.model_max_length, truncation=True, return_tensors="pt")
+>
+> {
+>     'input_ids': tensor([[49406,  4558, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407,
+>           49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407,
+>           49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407,
+>           49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407,
+>           49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407,
+>           49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407,
+>           49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407, 49407,
+>           49407, 49407, 49407, 49407, 49407, 49407, 49407]]),
+>      'attention_mask': tensor([[1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+>             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+>             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+>             0, 0, 0, 0, 0]])
+> }
+>```
 
 
 We can see above that our prompt of `"horse"` has been converted into different tokens:
@@ -162,31 +129,12 @@ We'll define this setup as a function as we'll be using it again later when we g
 
 
 ```python
-scheduler_config = {
-  "beta_end": 0.012,
-  "beta_schedule": "scaled_linear",
-  "beta_start": 0.00085,
-  "num_train_timesteps": 1000,
-  "set_alpha_to_one": False,
-  "steps_offset": 1,
-  "trained_betas": None,
-  "clip_sample": False
-}
-```
-
-
-```python
 def init_scheduler(num_inference_steps):  
     scheduler = DDIMScheduler(**scheduler_config)
     scheduler.set_timesteps(num_inference_steps)
     return scheduler
 ```
 
-
-```python
-num_inference_steps = 50
-scheduler = init_scheduler(num_inference_steps)
-```
 
 Next, we will define a generic function which creates noise and adds it to the latents we pass in. It also takes in a start step for the scheduler which allows us to control the amount of noise added to the image. 
 
@@ -232,14 +180,8 @@ It's also possible to decode the noisy latents using our VAE. There's a hint of 
 
 Now that we have created the noisy latents, we need to use our model to predict where the noise is in the image, given the two prompts that we're working with. The noise prediction code that we will use here is very similar to the code you would use when doing image generation. The main differences are that we are starting with our original image latents with 50% noise, and only doing a single step of noise prediction unlike the 50 we would do when generating an image.
 
-
 ```python
-guidance_scale = 7.5
-```
-
-
-```python
-def predict_noise(scheduler, latents, combined_embeddings, guidance_scale, timestep, seed=None):
+def predict_noise(scheduler, latents, combined_embeddings, guidance_scale=7.5, timestep=0, seed=None):
     if seed is not None:
         torch.manual_seed(seed)
     input = torch.cat([latents] * combined_embeddings.shape[0])
@@ -258,17 +200,12 @@ def predict_noise(scheduler, latents, combined_embeddings, guidance_scale, times
     return pred_original, pred_new
 ```
 
-The paper states that repeating the noise prediction 10 times allowed for a good mask to be generated, so we will use that value here.
+The paper states that repeating the noise prediction 10 times allowed for a good mask to be generated, so we will use that value here. We will then loop through and make our noise predictions. Each loop we set a different seed so that that added noise will be different, and then we take the difference in the noise predictions for our two prompts, and then store this difference in our variable `all_preds_base`. At the end of all the loops we divide `all_preds_base` by our number of loops to get an average difference over our 10 predictions.
 
 
 ```python
 n = 10
-```
 
-We will then loop through and make our noise predictions. Each loop we set a different seed so that that added noise will be different, and then we take the difference in the noise predictions for our two prompts, and then store this difference in our variable `all_preds_base`. At the end of all the loops we divide `all_preds_base` by our number of loops to get an average difference over our 10 predictions.
-
-
-```python
 with torch.no_grad():
     all_preds_base = torch.zeros_like(original_image_latents)
     original_preds_base = torch.zeros_like(original_image_latents)
@@ -297,14 +234,10 @@ You can see here that the horse prompt gives a fairly even noise prediction over
 
 
 
-```python
-all_preds_base.shape
-```
-
-
-
-
-    torch.Size([1, 4, 64, 64])
+> ```python
+> > all_preds_base.shape
+> torch.Size([1, 4, 64, 64])
+> ```
 
 
 
@@ -319,15 +252,11 @@ all_preds = all_preds / all_preds.max()
 ```
 
 
-```python
-all_preds.min(), all_preds.max()
-```
-
-
-
-
-    (tensor(0., device='cuda:0', dtype=torch.float16),
-     tensor(1., device='cuda:0', dtype=torch.float16))
+> ```python
+> > all_preds.min(), all_preds.max()
+> (tensor(0., device='cuda:0', dtype=torch.float16),
+>     tensor(1., device='cuda:0', dtype=torch.float16))
+> ```
 
 
 
@@ -379,53 +308,23 @@ If there are holes in the mask, there are other techniques that can help, such a
 
 # Applying DiffEdit to our original image
 
-Now we have a mask, we can utilise this to ensure that our image generation of our zebra only affects the sections under the mask. We do this using a standard image to image pipeline for a diffusion model, but with one main change. For each step of the denoising process, instead of removing the noise that our diffusion model predicts in the areas outside the mask, we will replace this with a version of our original image with the correct amount of noise. By doing this at each step of the denoising process, this allows the final generated image within the mask to seamlessly integrate with the original image outside of the mask, as we effectively trick it at each step into believing that it generated the background of the original image. We'll explain exactly how we do this in more detail later.
+Now we have a mask, we can utilise this to ensure that our image generation of our zebra only affects the sections under the mask. We do this using a standard img2img pipeline for a diffusion model, but with one main change: For each step of the denoising process, instead of removing the noise that our diffusion model predicts in the areas outside the mask, we will replace this with a version of our original image with the correct amount of noise. By doing this at each step of the denoising process, this allows the final generated image within the mask to seamlessly integrate with the original image outside of the mask, as we effectively trick it at each step into believing that it generated the background of the original image. We'll explain exactly how we do this in more detail later.
 
-For now, we want to set up our image to image pipeline in the standard way, with one exception - we want to create two schedulers, one which handles the denoising of the image we are generating as normal, but another which allows us to correctly noise our original image to the correct level, which we then use within the denoising step.
+For now, we want to set up our img2img pipeline in the standard way, with one exception - we want to create two schedulers, one which handles the denoising of the image we are generating as normal, and another which allows us to correctly noise our original image to the same level, which we will then use within the denoising step. We will call these `original_image_scheduler`, and `denoising_scheduler` respectively.
 
+Since we will be using an img2img pipeline, we will be passing in our original image latents rather than starting with pure noise. This is because we still want our zebra to have a similar pose to the horse which is present in our original image. We add roughly ~75% noise to our original image latents, by noising the image with a scheduler `start_step` which is already 25% of the way through the total number of steps, effectively skipping the first 25% of the noising process. This allows some of the original horse image to influence our zebra image generation. We save these new latents in the variable `noisy_latents`  and use these as the starting point for the image generation of our zebra.
 
-```python
-# set how much of the initial image should be replaced by noise at the start
-noise_strength = 0.75
-# set a manual seed to ensure that we get consistent results
-torch.manual_seed(3)
+The next step is to perform the denoising loop, starting with our noisy latents above and then progressively denoising the image using the prompt `"zebra"`, similar to a standard img2img pipeline. However, at each step of our denoising loop we must ensure that we only change the areas under the mask. We do this by calculating `xt` which is a version of our **original image latents** given the correct noise for the next step in the denoising process, and `yt` which is the slightly denoised latents which the scheduler has created **based on our U-Net's noise prediction**, and would typically be the input to the next step of the denoising loop for standard image generation.
 
-# create schedulers
-denoising_scheduler = init_scheduler(num_inference_steps)
-original_image_scheduler = init_scheduler(num_inference_steps)
+Next we combine the two sets of latents, to ensure that `yt` (the generated latents) is only applied within the masked area, and `xt` (our original image latents) makes up the rest of the image. We do this using an equation from the DiffEdit paper, and you can see that implemented in the code on the following line:
 
-# store step information
-total_steps = len(scheduler.timesteps)
-start_step = int(len(scheduler.timesteps)-(num_inference_steps*noise_strength))
+> ```python
+> noisy_latents = mask*yt+((1-mask)*xt)
+> ```
 
-# set up callback to see denoising process
-intermediate_latents = []
-callback = (lambda latents: intermediate_latents.append(latents))
+Our mask is a tensor with either 1 or 0 as its values, where 1 is within the masked area and 0 values for everywhere else. The first part of this code `mask*yt` is effectively multiplying the latents by 0 outside of the masked area, stopping the generated latents from having any influence on the image outside of the masked area. The second part of the equation: `((1-mask)*xt)`, which is doing the opposite - `1-mask`, makes all of the non-masked areas be equal to 1 and the masked areas equal to 0, so when we multiply `xt` by this, we reduce the influence of these latents **within** the masked area to 0. We add the two parts of this equation together to produce the input latents to the next step, where `xt` makes up the non-masked area of the latents, but `yt` makes up the masked area. These new `noisy_latents` then constitute the input to the next step of the denoising loop.
 
-# create text embeddings for new_prompt "zebra"
-text_embeddings = create_text_embeddings([new_prompt])
-
-mask = torch.from_numpy(mask_np).type(torch.half).to("cuda")
-```
-
-We use an image to image pipeline to pass in our original image, since we still want our zebra to have a similar pose to the horse which is present in our original image, so we add a lot of noise to the original image (~75%) and then we will use this as the starting point for our image generation of our zebra. We can see what that initial noise looks like below:
-
-
-```python
-# create initial noisy latents
-noisy_latents = create_noise(denoising_scheduler, original_image_latents, start_step=start_step)
-```
-
-Now we perform the denoising loop, starting with our noisy latents above and then progressively denoising the image using the prompt `"zebra"`. 
-
-At each step however we ensure that we only change the areas under the mask. We do this by calculating `xt` which is a version of our **original image latents** given the correct noise for the next step in the denoising process, and `yt` which is the slightly denoised latents which the scheduler has created **based on our U-Net's noise prediction**, and would typically be the input to the next step of the denoising loop for standard image generation.
-
-Next we combine the two sets of latents, to ensure that `yt` (the generated latents) is only applied within the masked area, and `xt` (our original image latents) make up the rest of the image. We do this using an equation from the DiffEdit paper, and you can see that implemented in the code on the following line:
-```python
-noisy_latents = mask*yt+((1-mask)*xt)
-```
-Our mask is a tensor with either 1 or 0 as its values, where 1 is within the masked area and 0 values for everywhere else. The first part of this code `mask*yt` is effectively multiplying the latents by 0 outside of the masked area, stopping the generated latents from having any influence on the image outside of the masked area. The second part of the equation: `((1-mask)*xt)`, which is doing the opposite - `1-mask`, makes all of the non-masked areas be equal to 1 and the masked areas equal to 0, so when we multiply `xt` by this, we reduce the influence of these latents **within** the masked area to 0. We add the two parts of this equation together to produce the input latents to the next step, where `xt` makes up the non-masked area of the latents, but `yt` makes up the masked area. These latents then make the input to the next loop of the denoising process.
-
+You can see how this all fits together within our denoising loop:
 
 ```python
 # denoising loop
@@ -460,7 +359,7 @@ for i, t in enumerate(tqdm(denoising_scheduler.timesteps[start_step:])):
 final_latents = noisy_latents
 ```
 
-Once the denoising loop is complete, we decode the final latents to see what our generated "zebra" DiffEdit image looks like!
+Once the denoising loop is complete, we can decode the `final_latents` to see what our generated `"zebra"` DiffEdit image looks like:
 
     
 ![png](diffedit_files/diffedit_87_0.png)
@@ -484,7 +383,7 @@ Something else which is worth considering is the limitations of the DiffEdit mas
 caption = "bowl of fruits"
 query = "sports cars"
 
-diffedit(fruit_bowl_image, caption, query, noise_strength=1, seed=1)
+diffedit(fruit_bowl_image, caption, query)
 ```
 
 
