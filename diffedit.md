@@ -200,7 +200,7 @@ def predict_noise(scheduler, latents, combined_embeddings, guidance_scale=7.5, t
     return pred_original, pred_new
 ```
 
-The paper states that repeating the noise prediction 10 times allowed for a good mask to be generated, so we will use that value here. We will then loop through and make our noise predictions. Each loop we set a different seed so that that added noise will be different, and then we take the difference in the noise predictions for our two prompts, and then store this difference in our variable `all_preds_base`. At the end of all the loops we divide `all_preds_base` by our number of loops to get an average difference over our 10 predictions.
+The paper states that repeating the noise prediction 10 times allowed for a good mask to be generated, so we will use that value here. We will then loop through and make our noise predictions. Each loop we set a different seed so that the added noise will be different, and then we take the difference in the noise predictions for our two prompts, and then store this difference in our variable `all_preds_base`. At the end of all the loops we divide `all_preds_base` by our number of loops to get an average difference over our 10 predictions.
 
 
 ```python
